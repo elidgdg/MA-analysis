@@ -149,3 +149,35 @@ def upsert_price_rows(
         """,
         ({**row, "company_id": company_id} for row in rows),
     )
+
+def upsert_volume_rows(
+    conn: sqlite3.Connection,
+    company_id: int,
+    rows: Iterable[dict[str, Any]],
+) -> None:
+    """Insert/update multiple volume records for a company."""
+    conn.executemany(
+        """
+        INSERT INTO volumes (company_id, volume_date, volume)
+        VALUES (:company_id, :date, :volume)
+        ON CONFLICT(company_id, volume_date) DO UPDATE SET
+            volume = excluded.volume
+        """,
+        ({**row, "company_id": company_id} for row in rows),
+    )
+
+def save_analysis_output(
+    conn: sqlite3.Connection,
+    event_id: int,
+    analysis_type: str,
+    output: dict[str, Any]
+) -> int:
+    """Save analysis output as a JSON string and return its ID."""
+    cursor = conn.execute(
+        """
+        INSERT INTO analysis_outputs (event_id, analysis_type, output_json)
+        VALUES (?, ?, ?)
+        """,
+        (event_id, analysis_type, json.dumps(output, indent=2, sort_keys=True)))
+    )
+    return int(cursor.lastrowid)
