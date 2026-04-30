@@ -18,7 +18,7 @@ def init_db(db_path: Path) -> None:
         conn.executescript(SCHEMA_SQL)
 
 
-def upinsert_company(
+def upsert_company(
     conn: sqlite3.Connection,
     ticker: str,
     name: str | None = None,
@@ -45,7 +45,7 @@ def upinsert_company(
     ).fetchone()
     return int(row["id"])
 
-def upinsert_shareholder(
+def upsert_shareholder(
     conn: sqlite3.Connection,
     name: str,
     holder_type: str | None = None,
@@ -98,7 +98,7 @@ def insert_ma_event(
     )
     return int(cursor.lastrowid)
 
-def upinsert_ownership_snapshot(
+def upsert_ownership_snapshot(
     conn: sqlite3.Connection,
     company_id: int,
     shareholder_id: int,
@@ -126,3 +126,4 @@ def upinsert_ownership_snapshot(
             company_id, shareholder_id, snapshot_date, rank, shares_held, ownership_pct, source
         )
     )
+
