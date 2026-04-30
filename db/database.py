@@ -97,3 +97,32 @@ def insert_ma_event(
         )
     )
     return int(cursor.lastrowid)
+
+def upinsert_ownership_snapshot(
+    conn: sqlite3.Connection,
+    company_id: int,
+    shareholder_id: int,
+    snapshot_date: str,
+    rank: int | None,
+    shares_held: float | None,
+    ownership_pct: float | None,
+    source: str | None
+) -> None:
+    """Insert/update an ownership snapshot record."""
+
+    conn.execute(
+        """
+        INSERT INTO ownership_snapshots (
+            company_id, shareholder_id, snapshot_date, rank,
+            shares_held, ownership_pct, source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(company_id, shareholder_id, snapshot_date) DO UPDATE SET
+            rank = excluded.rank,
+            shares_held = excluded.shares_held,
+            ownership_pct = excluded.ownership_pct,
+            source = COALESCE(excluded.source, ownership_snapshots.source),
+        """,
+        (
+            company_id, shareholder_id, snapshot_date, rank, shares_held, ownership_pct, source
+        )
+    )
