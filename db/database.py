@@ -67,3 +67,33 @@ def upinsert_shareholder(
         (name,)
     ).fetchone()
     return int(row["id"])
+
+def insert_ma_event(
+    conn: sqlite3.Connection,
+    target_company_id: int,
+    acquirer_company_id: int | None,
+    announcement_date: str | None,
+    effective_date: str | None,
+    index_implementation_date: str | None,
+    deal_type: str | None,
+    offer_price: float | None,
+    offer_currency: str | None,
+    status: str | None,
+    notes: str | None
+) -> int:
+    """Insert a new M&A event and return its ID."""
+    cursor = conn.execute(
+        """
+        INSERT INTO mna_events (
+            target_company_id, acquirer_company_id, announcement_date,
+            effective_date, index_implementation_date, deal_type,
+            offer_price, offer_currency, status, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            target_company_id, acquirer_company_id, announcement_date,
+            effective_date, index_implementation_date, deal_type,
+            offer_price, offer_currency, status, notes
+        )
+    )
+    return int(cursor.lastrowid)
