@@ -178,6 +178,6 @@ def save_analysis_output(
         INSERT INTO analysis_outputs (event_id, analysis_type, output_json)
         VALUES (?, ?, ?)
         """,
-        (event_id, analysis_type, json.dumps(output, indent=2, sort_keys=True)))
+        (event_id, analysis_type, json.dumps(output, indent=2, sort_keys=True))
     )
     return int(cursor.lastrowid)
