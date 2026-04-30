@@ -127,3 +127,25 @@ def upsert_ownership_snapshot(
         )
     )
 
+def upsert_price_rows(
+    conn: sqlite3.Connection,
+    company_id: int,
+    rows: Iterable[dict[str, Any]],
+) -> None:
+    """Insert/update multiple price records for a company."""
+    conn.executemany(
+        """
+        INSERT INTO prices (
+            company_id, price_date, open, high, low, close, adjusted_close, currency
+        )
+        VALUES (:company_id, :date, :open, :high, :low, :close, :adjusted_close, :currency)
+        ON CONFLICT(company_id, price_date) DO UPDATE SET
+            open = excluded.open,
+            high = excluded.high,
+            low = excluded.low,
+            close = excluded.close,
+            adjusted_close = excluded.adjusted_close,
+            currency = COALESCE(excluded.currency, prices.currency)
+        """,
+        ({**row, "company_id": company_id} for row in rows),
+    )
