@@ -16,3 +16,31 @@ def init_db(db_path: Path) -> None:
     """Initialize the database with the required schema."""
     with connect(db_path) as conn:
         conn.executescript(SCHEMA_SQL)
+
+
+def upinsert_company(
+    conn: sqlite3.Connection,
+    ticker: str,
+    name: str | None = None,
+    exchange: str | None = None,
+    country: str | None = None,
+    sector: str | None = None
+) -> Int:
+    """Insert/update a company record and return its ID."""
+    conn.execute(
+        """
+        INSERT INTO companies (ticker, name, exchange, country, sector)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(ticker) DO UPDATE SET
+            name = COALESCE(excluded.name, companies.name),
+            exchange = COALESCE(excluded.exchange, companies.exchange),
+            country = COALESCE(excluded.country, companies.country),
+            sector = COALESCE(excluded.sector, companies.sector)
+        """,
+        (ticker, name, exchange, country, sector)
+    )
+    row = conn.execute(
+        "SELECT id FROM companies WHERE ticker = ?",
+        (ticker,)
+    ).fetchone()
+    return int(row["id"])
