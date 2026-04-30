@@ -44,3 +44,26 @@ def upinsert_company(
         (ticker,)
     ).fetchone()
     return int(row["id"])
+
+def upinsert_shareholder(
+    conn: sqlite3.Connection,
+    name: str,
+    holder_type: str | None = None,
+    country: str | None = None
+) -> Int:
+    """Insert/update a shareholder record and return its ID."""
+    conn.execute(
+        """
+        INSERT INTO shareholders (name, holder_type, country)
+        VALUES (?, ?, ?)
+        ON CONFLICT(name) DO UPDATE SET
+            holder_type = COALESCE(excluded.holder_type, shareholders.holder_type),
+            country = COALESCE(excluded.country, shareholders.country)
+        """,
+        (name, holder_type, country)
+    )
+    row = conn.execute(
+        "SELECT id FROM shareholders WHERE name = ?",
+        (name,)
+    ).fetchone()
+    return int(row["id"])
