@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Any
 
 import blpapi
@@ -9,8 +8,10 @@ import blpapi
 class BloombergClient:
     """
     Minimal Bloomberg Desktop API client.
-
-    Works with Bloomberg Terminal/Desktop API on the same logged-in machine.
+    Supports:
+    - reference data
+    - historical data
+    - recursive conversion of bulk/sequence elements to Python
     """
 
     def __init__(
@@ -45,14 +46,6 @@ class BloombergClient:
     ) -> dict[str, Any]:
         """
         Fetch Bloomberg reference data for one security.
-
-        Returns a dict like:
-        {
-            "security": "NSC US Equity",
-            "PX_LAST": 250.12,
-            "NAME": "Norfolk Southern Corp",
-            ...
-        }
         """
         session = self._start_session()
         try:
@@ -112,18 +105,7 @@ class BloombergClient:
     ) -> list[dict[str, Any]]:
         """
         Fetch Bloomberg historical data for one security.
-
         Dates must be YYYY-MM-DD or YYYYMMDD.
-
-        Returns rows like:
-        [
-            {
-                "date": "2025-07-23",
-                "PX_LAST": 250.1,
-                "PX_VOLUME": 1234567,
-            },
-            ...
-        ]
         """
         session = self._start_session()
         try:
@@ -166,9 +148,8 @@ class BloombergClient:
                                 row: dict[str, Any] = {}
 
                                 if row_el.hasElement("date"):
-                                    if row_el.hasElement("date"):
-                                        dt = row_el.getElementAsDatetime("date")
-                                        row["date"] = str(dt)
+                                    dt = row_el.getElementAsDatetime("date")
+                                    row["date"] = dt.isoformat() if hasattr(dt, "isoformat") else str(dt)
 
                                 for field in fields:
                                     if row_el.hasElement(field):
@@ -189,21 +170,44 @@ class BloombergClient:
 
     @staticmethod
     def _normalise_date(value: str) -> str:
-        """
-        Convert YYYY-MM-DD to YYYYMMDD. Leave YYYYMMDD unchanged.
-        """
         value = value.strip()
         if "-" in value:
             return value.replace("-", "")
         return value
 
-    @staticmethod
-    def _element_to_python(element: blpapi.Element) -> Any:
+    @classmethod
+    def _element_to_python(cls, element: blpapi.Element) -> Any:
         """
-        Best-effort conversion from Bloomberg Element to Python value.
+        Recursively convert Bloomberg Element to native Python.
+        Handles:
+        - scalars
+        - arrays
+        - sequences / bulk fields
         """
         if element.isNull():
             return None
+
+        # Arrays / repeated values
+        if element.isArray():
+            out = []
+            for i in range(element.numValues()):
+                try:
+                    sub = element.getValueAsElement(i)
+                    out.append(cls._element_to_python(sub))
+                except Exception:
+                    try:
+                        out.append(element.getValue(i))
+                    except Exception:
+                        out.append(str(element.getValueAsString(i)))
+            return out
+
+        # Sequences / complex nested objects
+        if element.isComplexType():
+            out: dict[str, Any] = {}
+            for i in range(element.numElements()):
+                sub = element.getElement(i)
+                out[str(sub.name())] = cls._element_to_python(sub)
+            return out
 
         datatype = element.datatype()
 
@@ -222,13 +226,19 @@ class BloombergClient:
         if datatype == blpapi.DataType.CHAR:
             return element.getValueAsString()
         if datatype == blpapi.DataType.DATE:
-            return str(element.getValueAsDatetime().date())
+            dt = element.getValueAsDatetime()
+            return dt.isoformat() if hasattr(dt, "isoformat") else str(dt)
         if datatype == blpapi.DataType.DATETIME:
-            return str(element.getValueAsDatetime())
+            dt = element.getValueAsDatetime()
+            return dt.isoformat() if hasattr(dt, "isoformat") else str(dt)
         if datatype == blpapi.DataType.TIME:
-            return str(element.getValueAsDatetime().time())
+            dt = element.getValueAsDatetime()
+            return dt.isoformat() if hasattr(dt, "isoformat") else str(dt)
 
         try:
             return element.getValue()
         except Exception:
-            return str(element)
+            try:
+                return element.getValueAsString()
+            except Exception:
+                return str(element)
