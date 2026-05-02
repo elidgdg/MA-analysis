@@ -11,6 +11,7 @@ class BloombergClient:
     Supports:
     - reference data
     - historical data
+    - security lookup
     - recursive conversion of bulk/sequence elements to Python
     """
 
@@ -24,7 +25,7 @@ class BloombergClient:
         self.port = port
         self.timeout_ms = timeout_ms
 
-    def _start_session(self) -> blpapi.Session:
+    def _start_session_for_service(self, service_name: str) -> blpapi.Session:
         options = blpapi.SessionOptions()
         options.setServerHost(self.host)
         options.setServerPort(self.port)
@@ -33,9 +34,9 @@ class BloombergClient:
         if not session.start():
             raise RuntimeError("Failed to start Bloomberg session.")
 
-        if not session.openService("//blp/refdata"):
+        if not session.openService(service_name):
             session.stop()
-            raise RuntimeError("Failed to open Bloomberg //blp/refdata service.")
+            raise RuntimeError(f"Failed to open Bloomberg service {service_name}.")
 
         return session
 
@@ -44,10 +45,7 @@ class BloombergClient:
         security: str,
         fields: list[str],
     ) -> dict[str, Any]:
-        """
-        Fetch Bloomberg reference data for one security.
-        """
-        session = self._start_session()
+        session = self._start_session_for_service("//blp/refdata")
         try:
             service = session.getService("//blp/refdata")
             request = service.createRequest("ReferenceDataRequest")
@@ -103,11 +101,7 @@ class BloombergClient:
         end_date: str,
         periodicity_selection: str = "DAILY",
     ) -> list[dict[str, Any]]:
-        """
-        Fetch Bloomberg historical data for one security.
-        Dates must be YYYY-MM-DD or YYYYMMDD.
-        """
-        session = self._start_session()
+        session = self._start_session_for_service("//blp/refdata")
         try:
             service = session.getService("//blp/refdata")
             request = service.createRequest("HistoricalDataRequest")
@@ -168,6 +162,93 @@ class BloombergClient:
         finally:
             session.stop()
 
+    def security_lookup(
+        self,
+        query: str,
+        max_results: int = 10,
+        yellow_key_filter: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Use Bloomberg instruments service to resolve a company name to likely securities.
+
+        Returns candidates with an extra field:
+        - refdata_security
+
+        which is the proper security string to use in //blp/refdata,
+        e.g. 'NSC US Equity' instead of 'NSC US<equity>'.
+        """
+        session = self._start_session_for_service("//blp/instruments")
+        try:
+            service = session.getService("//blp/instruments")
+            request = service.createRequest("instrumentListRequest")
+
+            request.set("query", query)
+            request.set("maxResults", max_results)
+
+            if yellow_key_filter:
+                request.set("yellowKeyFilter", yellow_key_filter)
+
+            session.sendRequest(request)
+
+            results: list[dict[str, Any]] = []
+
+            while True:
+                event = session.nextEvent(self.timeout_ms)
+
+                for msg in event:
+                    if msg.hasElement("responseError"):
+                        raise RuntimeError(f"Bloomberg response error: {msg}")
+
+                    if msg.messageType() == blpapi.Name("InstrumentListResponse"):
+                        if msg.hasElement("results"):
+                            res_arr = msg.getElement("results")
+
+                            for i in range(res_arr.numValues()):
+                                item = res_arr.getValueAsElement(i)
+
+                                security = item.getElementAsString("security") if item.hasElement("security") else None
+                                description = item.getElementAsString("description") if item.hasElement("description") else None
+                                ticker = item.getElementAsString("ticker") if item.hasElement("ticker") else None
+                                yellow_key = item.getElementAsString("yellowKey") if item.hasElement("yellowKey") else None
+                                country = item.getElementAsString("country") if item.hasElement("country") else None
+                                exchange = item.getElementAsString("exchange") if item.hasElement("exchange") else None
+
+                                refdata_security = None
+
+                                # Best case: ticker + yellowKey gives proper refdata string
+                                if ticker and yellow_key:
+                                    refdata_security = f"{ticker} {yellow_key}"
+
+                                # Fallback: convert raw instrument security like COV US<equity> -> COV US Equity
+                                elif security:
+                                    refdata_security = security
+                                    refdata_security = refdata_security.replace("<equity>", " Equity")
+                                    refdata_security = refdata_security.replace("<corp>", " Corp")
+                                    refdata_security = refdata_security.replace("<govt>", " Govt")
+                                    refdata_security = refdata_security.replace("<index>", " Index")
+                                    refdata_security = refdata_security.replace("<cmdty>", " Comdty")
+                                    refdata_security = refdata_security.replace("<currency>", " Curncy")
+
+                                row = {
+                                    "security": security,
+                                    "description": description,
+                                    "ticker": ticker,
+                                    "yellowKey": yellow_key,
+                                    "country": country,
+                                    "exchange": exchange,
+                                    "refdata_security": refdata_security,
+                                }
+                                results.append(row)
+
+                if event.eventType() == blpapi.Event.RESPONSE:
+                    break
+
+            return results
+        finally:
+            session.stop()
+
+    
+
     @staticmethod
     def _normalise_date(value: str) -> str:
         value = value.strip()
@@ -177,17 +258,9 @@ class BloombergClient:
 
     @classmethod
     def _element_to_python(cls, element: blpapi.Element) -> Any:
-        """
-        Recursively convert Bloomberg Element to native Python.
-        Handles:
-        - scalars
-        - arrays
-        - sequences / bulk fields
-        """
         if element.isNull():
             return None
 
-        # Arrays / repeated values
         if element.isArray():
             out = []
             for i in range(element.numValues()):
@@ -198,10 +271,12 @@ class BloombergClient:
                     try:
                         out.append(element.getValue(i))
                     except Exception:
-                        out.append(str(element.getValueAsString(i)))
+                        try:
+                            out.append(element.getValueAsString(i))
+                        except Exception:
+                            out.append(str(element))
             return out
 
-        # Sequences / complex nested objects
         if element.isComplexType():
             out: dict[str, Any] = {}
             for i in range(element.numElements()):
