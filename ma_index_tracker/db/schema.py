@@ -15,16 +15,24 @@ CREATE TABLE IF NOT EXISTS companies (
 
 CREATE TABLE IF NOT EXISTS mna_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bbg_deal_id TEXT,
     target_company_id INTEGER NOT NULL,
     acquirer_company_id INTEGER,
     announcement_date TEXT,
+    expected_completion_date TEXT,
     effective_date TEXT,
     index_implementation_date TEXT,
     deal_type TEXT,
+    payment_type TEXT,
     offer_price REAL,
     offer_currency TEXT,
+    cash_terms_per_tgt_sh REAL,
+    stock_terms_acq_sh_per_tgt_sh REAL,
+    nature_of_bid TEXT,
+    percent_owned_sought REAL,
     status TEXT,
     notes TEXT,
+    raw_deal_json TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (target_company_id) REFERENCES companies(id),
@@ -89,6 +97,9 @@ CREATE TABLE IF NOT EXISTS analysis_outputs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mna_events_target ON mna_events(target_company_id);
+CREATE INDEX IF NOT EXISTS idx_mna_events_bbg_deal_id ON mna_events(bbg_deal_id);
 CREATE INDEX IF NOT EXISTS idx_prices_company_date ON prices(company_id, price_date);
 CREATE INDEX IF NOT EXISTS idx_volumes_company_date ON volumes(company_id, volume_date);
+CREATE INDEX IF NOT EXISTS idx_ownership_snapshots_company_date
+    ON ownership_snapshots(company_id, snapshot_date);
 """
