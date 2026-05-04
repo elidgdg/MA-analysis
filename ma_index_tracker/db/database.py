@@ -270,6 +270,65 @@ def upsert_volume_rows(
     )
 
 
+def upsert_event_source(
+    conn: sqlite3.Connection,
+    *,
+    event_id: int,
+    rank: int,
+    title: str,
+    url: str,
+    publisher: str | None,
+    published_at: str | None,
+    source_type: str | None = "news",
+) -> None:
+    """
+    Insert/update one display source for an M&A event.
+    """
+    conn.execute(
+        """
+        INSERT INTO event_sources (
+            event_id,
+            rank,
+            title,
+            url,
+            publisher,
+            published_at,
+            source_type
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(event_id, url) DO UPDATE SET
+            rank = excluded.rank,
+            title = excluded.title,
+            publisher = excluded.publisher,
+            published_at = excluded.published_at,
+            source_type = excluded.source_type
+        """,
+        (event_id, rank, title, url, publisher, published_at, source_type),
+    )
+
+
+def get_event_sources(conn: sqlite3.Connection, event_id: int) -> list[dict[str, Any]]:
+    """
+    Return source links for an event in display order.
+    """
+    rows = conn.execute(
+        """
+        SELECT
+            rank,
+            title,
+            url,
+            publisher,
+            published_at,
+            source_type
+        FROM event_sources
+        WHERE event_id = ?
+        ORDER BY rank, id
+        """,
+        (event_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def save_analysis_output(
     conn: sqlite3.Connection,
     event_id: int,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ma_index_tracker.db.database import save_analysis_output
+from ma_index_tracker.db.database import get_event_sources, save_analysis_output
 
 
 def get_event_summary(conn, event_id: int) -> dict[str, Any]:
@@ -72,6 +72,7 @@ def build_event_view(conn, event_id: int) -> dict[str, Any]:
     result = {
         "event_id": event_id,
         "event_summary": event_summary,
+        "sources": get_event_sources(conn, event_id),
         "headline_metrics": {
             "announcement_jump": target_analysis.get("announcement_jump"),
             "avg_pre_announcement_volume": target_analysis.get("avg_pre_announcement_volume"),
