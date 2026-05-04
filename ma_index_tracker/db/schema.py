@@ -96,10 +96,26 @@ CREATE TABLE IF NOT EXISTS analysis_outputs (
     FOREIGN KEY (event_id) REFERENCES mna_events(id)
 );
 
+CREATE TABLE IF NOT EXISTS event_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    rank INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    publisher TEXT,
+    published_at TEXT,
+    source_type TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES mna_events(id),
+    UNIQUE (event_id, url)
+);
+
 CREATE INDEX IF NOT EXISTS idx_mna_events_target ON mna_events(target_company_id);
 CREATE INDEX IF NOT EXISTS idx_mna_events_bbg_deal_id ON mna_events(bbg_deal_id);
 CREATE INDEX IF NOT EXISTS idx_prices_company_date ON prices(company_id, price_date);
 CREATE INDEX IF NOT EXISTS idx_volumes_company_date ON volumes(company_id, volume_date);
 CREATE INDEX IF NOT EXISTS idx_ownership_snapshots_company_date
     ON ownership_snapshots(company_id, snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_event_sources_event_rank
+    ON event_sources(event_id, rank);
 """
