@@ -216,3 +216,28 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local database / generated outputs
+failed_deal_loads.json
+
+# Frontend
+ui/frontend/node_modules/
+ui/frontend/.next/
+ui/frontend/out/
+
+# Backend
+ui/backend/.venv/
+ui/backend/venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
