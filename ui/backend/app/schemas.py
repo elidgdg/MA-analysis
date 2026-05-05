@@ -31,6 +31,20 @@ class DealSummaryResponse(BaseModel):
     announced_total_value_mil: float | None
 
 
+class SourceItem(BaseModel):
+    rank: int
+    title: str
+    url: str
+    publisher: str | None
+    published_at: str | None
+    source_type: str | None
+
+
+class EventSourcesResponse(BaseModel):
+    event_id: int
+    sources: list[SourceItem]
+
+
 class AnalogueSelectionResponse(BaseModel):
     data: dict[str, Any]
 
