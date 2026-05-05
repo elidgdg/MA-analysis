@@ -3,8 +3,11 @@ import DealSummary from "../components/DealSummary";
 import HeadlineMetrics from "../components/HeadlineMetrics";
 import AnalogueTable from "../components/AnalogueTable";
 import ComparisonCharts from "../components/ComparisonCharts";
+import SourcesList from "../components/SourcesList";
+import InsightCommentary from "../components/InsightCommentary";
 import {
   fetchDealComparison,
+  fetchDealSources,
   fetchDealSummary,
   fetchPendingDeals,
 } from "../lib/api";
@@ -44,6 +47,8 @@ export default async function HomePage({
   const eventId = selectedDeal.event_id;
 
   const summary = await fetchDealSummary(eventId);
+  const sourcesResponse = await fetchDealSources(eventId);
+  const sources = sourcesResponse.sources ?? [];
 
   let comparison: any = null;
   let comparisonError: string | null = null;
@@ -60,6 +65,8 @@ export default async function HomePage({
   const headline = comparison?.headline_comparison ?? {
     pending_announcement_jump: null,
     analogue_median_announcement_jump: null,
+    pending_day_5_return: null,
+    analogue_median_day_5_return: null,
     pending_latest_spread_abs: null,
     analogue_median_latest_spread_abs_same_day: null,
   };
@@ -70,7 +77,7 @@ export default async function HomePage({
         M&A Analogue Dashboard
       </h1>
       <p style={{ color: "#475569", marginBottom: "24px" }}>
-        Pending deal selection, analogue ranking, and comparison summaries.
+        Pending deal selection, analogue ranking, comparison summaries, and relevant sources.
       </p>
 
       <div
@@ -85,6 +92,8 @@ export default async function HomePage({
 
         <section style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <DealSummary summary={summary} />
+
+          <SourcesList sources={sources} />
 
           {comparisonError ? (
             <div
@@ -102,6 +111,11 @@ export default async function HomePage({
             </div>
           ) : (
             <>
+              <InsightCommentary
+                headline={headline}
+                analogueSelection={comparison.analogue_selection}
+              />
+
               <HeadlineMetrics headline={headline} />
 
               <AnalogueTable analogues={analogues} />

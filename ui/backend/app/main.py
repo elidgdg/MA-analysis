@@ -13,7 +13,9 @@ from app.schemas import (
     AnalogueComparisonResponse,
     AnalogueSelectionResponse,
     DealSummaryResponse,
+    EventSourcesResponse,
     PendingDealItem,
+    SourceItem,
 )
 
 PROJECT_ROOT = get_project_root()
@@ -22,7 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from ma_index_tracker.analogues import compute_analogue_selection, get_event_feature_row
 from ma_index_tracker.comparison import compute_analogue_comparison
-from ma_index_tracker.db.database import connect
+from ma_index_tracker.db.database import connect, get_event_sources
 
 
 app = FastAPI(title="M&A Analogue Dashboard API")
@@ -52,10 +54,6 @@ def extract_csv_acquirer_name(raw_deal_json: str | None) -> str | None:
 
 
 def with_acquirer_fallback(row: dict[str, Any]) -> dict[str, Any]:
-    """
-    If joined acquirer company info is missing, fall back to the acquirer name
-    stored in raw_deal_json from the original CSV row.
-    """
     out = dict(row)
 
     if out.get("acquirer_name") in (None, "", "--"):
@@ -140,6 +138,26 @@ def get_deal_summary(event_id: int) -> DealSummaryResponse:
     )
 
 
+@app.get("/deal/{event_id}/sources", response_model=EventSourcesResponse)
+def get_deal_sources(event_id: int) -> EventSourcesResponse:
+    db_path = get_db_path()
+
+    with connect(db_path) as conn:
+        exists = conn.execute(
+            "SELECT id FROM mna_events WHERE id = ?",
+            (event_id,),
+        ).fetchone()
+        if exists is None:
+            raise HTTPException(status_code=404, detail=f"No event found for event_id={event_id}")
+
+        sources = get_event_sources(conn, event_id)
+
+    return EventSourcesResponse(
+        event_id=event_id,
+        sources=[SourceItem(**dict(source)) for source in sources],
+    )
+
+
 @app.get("/deal/{event_id}/analogues", response_model=AnalogueSelectionResponse)
 def get_deal_analogues(event_id: int, top_k: int = 10) -> AnalogueSelectionResponse:
     db_path = get_db_path()
@@ -150,7 +168,6 @@ def get_deal_analogues(event_id: int, top_k: int = 10) -> AnalogueSelectionRespo
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
 
-    # apply fallback acquirer names to pending event and analogue rows
     pending_event = with_acquirer_fallback(result["pending_event"])
     analogues = [with_acquirer_fallback(row) for row in result["analogues"]]
 
@@ -182,7 +199,6 @@ def get_deal_comparison(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
 
-    # apply fallback acquirer names anywhere they may appear
     result = dict(result)
     result["analogue_selection"] = dict(result["analogue_selection"])
     result["analogue_selection"]["pending_event"] = with_acquirer_fallback(
