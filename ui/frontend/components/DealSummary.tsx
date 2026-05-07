@@ -1,3 +1,7 @@
+import { Badge } from "./ui/badge";
+import { Card, CardContent } from "./ui/card";
+import { formatDate, formatUSDMil } from "../lib/format";
+
 type Props = {
   summary: {
     target_name: string;
@@ -12,41 +16,61 @@ type Props = {
   };
 };
 
+function formatPercent(value: number | null) {
+  if (value === null || value === undefined) return "—";
+  return `${value.toFixed(1)}%`;
+}
+
+function MetaCell({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <span className="text-sm font-medium text-foreground">{value ?? "—"}</span>
+    </div>
+  );
+}
+
 export default function DealSummary({ summary }: Props) {
   return (
-    <div
-      style={{
-        background: "white",
-        border: "1px solid #e2e8f0",
-        borderRadius: "16px",
-        padding: "20px",
-      }}
-    >
-      <h2 style={{ marginTop: 0, marginBottom: "8px" }}>
-        {summary.target_name} / {summary.acquirer_name ?? "Unknown acquirer"}
-      </h2>
+    <Card className="overflow-hidden">
+      <div className="bg-grid border-b bg-muted/30 px-6 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Pending deal
+            </span>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {summary.target_name}{" "}
+              <span className="text-muted-foreground">←</span>{" "}
+              <span className="font-medium text-foreground/80">
+                {summary.acquirer_name ?? "Unknown acquirer"}
+              </span>
+            </h2>
+          </div>
 
-      <div style={{ color: "#475569" }}>
-        {summary.payment_type ?? "N/A"} · {summary.target_sector ?? "N/A"} ·
-        Announcement: {summary.announcement_date ?? "N/A"}
+          <div className="flex flex-wrap items-center gap-2">
+            {summary.payment_type && (
+              <Badge variant="secondary">{summary.payment_type}</Badge>
+            )}
+            {summary.nature_of_bid && (
+              <Badge variant="outline">{summary.nature_of_bid}</Badge>
+            )}
+            {summary.target_sector && (
+              <Badge variant="muted">{summary.target_sector}</Badge>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div style={{ color: "#475569", marginTop: "6px" }}>
-        Expected completion: {summary.expected_completion_date ?? "N/A"}
-      </div>
-
-      <div style={{ color: "#475569", marginTop: "6px" }}>
-        Announced deal value (mil):{" "}
-        {summary.announced_total_value_mil ?? "N/A"}
-      </div>
-
-      <div style={{ color: "#475569", marginTop: "6px" }}>
-        Nature of bid: {summary.nature_of_bid ?? "N/A"}
-      </div>
-
-      <div style={{ color: "#475569", marginTop: "6px" }}>
-        Percent sought: {summary.percent_owned_sought ?? "N/A"}
-      </div>
-    </div>
+      <CardContent className="grid grid-cols-2 gap-x-6 gap-y-5 p-6 sm:grid-cols-3 lg:grid-cols-5">
+        <MetaCell label="Announced" value={formatDate(summary.announcement_date)} />
+        <MetaCell label="Expected close" value={formatDate(summary.expected_completion_date)} />
+        <MetaCell label="Deal value" value={formatUSDMil(summary.announced_total_value_mil)} />
+        <MetaCell label="% sought" value={formatPercent(summary.percent_owned_sought)} />
+        <MetaCell label="Sector" value={summary.target_sector} />
+      </CardContent>
+    </Card>
   );
 }
